@@ -1,0 +1,98 @@
+---
+task-definitions:
+  - &terraform-setup
+    task: prepare-terraform-env
+    file: terraform-src/ci/tasks/prepare-terraform-env.yml
+    params:
+      oracle_apikey: ((oracle-apikey.private_key))
+
+  - &terraform-apply
+    put: terraform-oci
+    params:
+      terraform_source: terraform-src/ci/terraform
+      generate_random_name: true
+      plugin_dir: /.terraform.d/plugins/linux_amd64
+      vars:
+        director_compartment_name: ((director-compartment-name))
+      var_files: [terraform-env/oci.vars]
+
+  - &terraform-destroy
+    put: terraform-oci
+    params:
+      terraform_source: terraform-src/ci/terraform
+      env_name_file: terraform-oci/name
+      action: destroy
+      var_files: [terraform-env/oci.vars]
+      plugin_dir: /.terraform.d/plugins/linux_amd64
+    get_params:
+        action: destroy
+
+groups:
+  - name: test-tf-resource
+    jobs:
+      - tf-apply
+      - tf-destroy
+
+jobs:
+
+  - name: tf-apply
+    serial_groups: [oci-resource-consumer]
+    serial: true
+    plan:
+      - aggregate:
+        - {trigger: false, get: terraform-src, resource: terraform-src}
+
+      - <<: *terraform-setup
+      - <<: *terraform-apply
+      - task: show-outputs
+        config:
+          platform: linux
+          inputs:
+            - name: terraform-oci
+          run:
+            path: /bin/sh
+            args:
+              - -c
+              - |
+                  echo "metadata: $(cat terraform-oci/metadata)"
+  - name: tf-destroy
+    serial_groups: [oci-resource-consumer]
+    serial: true
+    plan:
+      - aggregate:
+        - {trigger: false, passed: [tf-apply], get: terraform-src, resource: terraform-src}
+
+      - <<: *terraform-destroy
+
+resource_types:
+  - name: terraform
+    type: docker-image
+    source:
+      repository: ((docker-repo-name))/oci-terraform-resource
+
+resources:
+  - name: terraform-src
+    type: git
+    source:
+      uri: https://github.com/dmutreja/terraform-resource-test.git
+      branch: master
+      username: ((github-user.username))
+      password: ((github-user.password))
+
+  - name: terraform-oci
+    type: terraform
+    source:
+       storage:
+         bucket: ((oracle-fixture-env-bucket-name))
+         bucket_path: terraform-resource-test/
+         access_key_id: ((oracle-s3-access-key-id))
+         secret_access_key: ((oracle-s3-secret-access-key))
+         region_name: ((oracle-region))
+         endpoint: https://((oracle-namespace)).compat.objectstorage.((oracle-region)).oraclecloud.com
+         use_signing_v4: true
+       vars:
+        oracle_tenancy: ((oracle-tenancy))
+        oracle_user: ((oracle-user))
+        oracle_region: ((oracle-region))
+        oracle_fingerprint: ((oracle-fingerprint))
+
