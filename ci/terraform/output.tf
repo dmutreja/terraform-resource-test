@@ -76,20 +76,6 @@ output bats_subnet2_static_ip {
    value = "${cidrhost(oci_core_subnet.bats_subnet2.cidr_block, 30)}"
 }
 
-/*
-output director_subnet {
-  value = <<EOS
-{
-   "subnet_id" : "${oci_core_subnet.director_subnet.id}",
-   "compartment_id" : "${oci_core_subnet.director_subnet.compartment_id}",
-   "ad" : "${oci_core_subnet.director_subnet.availability_domain}",
-   "vcn":  "${var.director_vcn}",
-   "subnet_name" : "${oci_core_subnet.director_subnet.display_name}",
-   "subnet_cidr" : "${oci_core_subnet.director_subnet.cidr_block}",
-   "subnet_gw" : "${cidrhost(oci_core_subnet.director_subnet.cidr_block, 1)}",
-   "director_ip" : "${cidrhost(oci_core_subnet.director_subnet.cidr_block, 2)}"
-
+output external_ip {
+  value = "${oci_core_public_ip.director_vip.ip_address}"
 }
-EOS
-}
-*/
